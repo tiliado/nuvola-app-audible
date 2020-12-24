@@ -38,6 +38,7 @@
   // Initialization routines
   WebApp._onInitWebWorker = function (emitter) {
     Nuvola.WebApp._onInitWebWorker.call(this, emitter)
+    this.timeTotal = null
 
     const state = document.readyState
     if (state === 'interactive' || state === 'complete') {
@@ -58,16 +59,35 @@
 
   // Extract data from the web page
   WebApp.update = function () {
+    const elms = this._getElements()
+    const time = this._getTime()
+
+    let state
+    if (elms.pause) {
+      state = PlaybackState.PLAYING
+    } else if (elms.play) {
+      state = PlaybackState.PAUSED
+    } else {
+      state = PlaybackState.UNKNOWN
+    }
+    player.setPlaybackState(state)
+
     const track = {
-      title: null,
+      title: Nuvola.queryAttribute('#adbl-cloud-player-container input[name="title"]', 'value'),
       artist: null,
       album: null,
-      artLocation: null,
-      rating: null
+      artLocation: Nuvola.queryAttribute('#adbl-cloud-player-product img', 'src'),
+      rating: null,
+      length: time[1]
     }
 
     player.setTrack(track)
-    player.setPlaybackState(PlaybackState.UNKNOWN)
+
+    player.setCanGoPrev(!!elms.prev)
+    player.setCanGoNext(!!elms.next)
+    player.setCanPlay(!!elms.play)
+    player.setCanPause(!!elms.pause)
+    player.setTrackPosition(time[0])
 
     // Schedule the next update
     setTimeout(this.update.bind(this), 500)
@@ -75,10 +95,74 @@
 
   // Handler of playback actions
   WebApp._onActionActivated = function (emitter, name, param) {
+    const elms = this._getElements()
     switch (name) {
-      case PlayerAction.Play:
+      case PlayerAction.TOGGLE_PLAY:
+        if (elms.play) {
+          Nuvola.clickOnElement(elms.play)
+        } else {
+          Nuvola.clickOnElement(elms.pause)
+        }
+        break
+      case PlayerAction.PLAY:
+        Nuvola.clickOnElement(elms.play)
+        break
+      case PlayerAction.PAUSE:
+      case PlayerAction.STOP:
+        Nuvola.clickOnElement(elms.pause)
+        break
+      case PlayerAction.PREV_SONG:
+        Nuvola.clickOnElement(elms.prev)
+        break
+      case PlayerAction.NEXT_SONG:
+        Nuvola.clickOnElement(elms.next)
         break
     }
+  }
+
+  WebApp._onNavigationRequest = function (object, request) {
+    // Don't open the player in a new window
+    if (request.url.startsWith('https://www.audible.com/webplayer')) {
+      request.approved = true
+      request.newWindow = false
+    } else {
+      Nuvola.WebApp._onNavigationRequest.call(this, object, request)
+    }
+  }
+
+  WebApp._getElements = function () {
+  // Interesting elements
+    const elms = {
+      play: document.querySelector('img.adblPlayButton'),
+      pause: document.querySelector('img.adblPauseButton'),
+      next: document.querySelector('img.adblNextChapter'),
+      prev: document.querySelector('img.adblPreviousChapter')
+    }
+
+    // Ignore disabled buttons
+    for (const key in elms) {
+      if (elms[key] && elms[key].classList.contains('bc-hidden')) {
+        elms[key] = null
+      }
+    }
+
+    return elms
+  }
+
+  WebApp._getTime = function () {
+    let elm = document.getElementById('adblMediaBarTimeSpent')
+    const elapsed = elm ? Nuvola.parseTimeUsec(elm.textContent) : null
+    elm = document.getElementById('adblMediaBarTimeLeft')
+    const remaining = elm ? Nuvola.parseTimeUsec(elm.textContent.replace('– ', '')) : null
+    const total = elapsed !== null && remaining != null ? elapsed + remaining : null
+
+    if (total === null) {
+      this.timeTotal = null
+    } else if (this.timeTotal === null || Math.abs(this.timeTotal - total) > 1000000) {
+      this.timeTotal = total
+    }
+
+    return [elapsed, this.timeTotal]
   }
 
   WebApp.start()
