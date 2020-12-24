@@ -1,0 +1,13 @@
+Makefile
+metadata.json
+icons
+/screenshots/
+nuvola-app-audible
+eu.tiliado.NuvolaAppAudible.desktop
+eu.tiliado.NuvolaAppAudible.service
+eu.tiliado.NuvolaAppAudible.appdata.xml
+nuvola-app-audible.metainfo.xml
+eu.tiliado.WebRuntimeAppAudible.desktop
+eu.tiliado.WebRuntimeAppAudible.service
+eu.tiliado.WebRuntimeAppAudible.appdata.xml
+nuvola-app-audible.metainfo.xml
