@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Jiří Janoušek <janousek.jiri@gmail.com>
+ * Copyright 2020-2021 Jiří Janoušek <janousek.jiri@gmail.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -25,6 +25,23 @@
 'use strict';
 
 (function (Nuvola) {
+  const _ = Nuvola.Translate.gettext
+  const C_ = Nuvola.Translate.pgettext
+
+  const COUNTRY_VARIANT = 'app.country_variant'
+  const HOME_PAGE = 'https://www.audible.{1}/library/'
+  const COUNTRY_VARIANTS = [
+    ['de', C_('Amazon variant', 'Germany')],
+    ['fr', C_('Amazon variant', 'France')],
+    ['co.uk', C_('Amazon variant', 'United Kingdom')],
+    ['com', C_('Amazon variant', 'United States')],
+    ['it', C_('Amazon variant', 'Italy')],
+    ['ca', C_('Amazon variant', 'Canada')],
+    ['in', C_('Amazon variant', 'India')]
+  ]
+
+  COUNTRY_VARIANTS.sort((a, b) => a[1] > b[1])
+
   // Create media player component
   const player = Nuvola.$object(Nuvola.MediaPlayer)
 
@@ -38,6 +55,8 @@
   // Initialization routines
   WebApp._onInitWebWorker = function (emitter) {
     Nuvola.WebApp._onInitWebWorker.call(this, emitter)
+    Nuvola.config.setDefaultAsync(COUNTRY_VARIANT, '').catch(console.log.bind(console))
+    Nuvola.config.connect('ConfigChanged', this)
     this.timeTotal = null
 
     const state = document.readyState
@@ -55,6 +74,34 @@
 
     // Start update routine
     this.update()
+  }
+
+  WebApp._onInitializationForm = function (emitter, values, entries) {
+    if (!Nuvola.config.hasKey(COUNTRY_VARIANT)) {
+      this.appendPreferences(values, entries)
+    }
+  }
+
+  WebApp.appendPreferences = function (values, entries) {
+    values[COUNTRY_VARIANT] = Nuvola.config.get(COUNTRY_VARIANT)
+    entries.push(['header', _('Audible')])
+    entries.push(['label', _('Preferred national variant')])
+    for (let i = 0; i < COUNTRY_VARIANTS.length; i++) {
+      entries.push(['option', COUNTRY_VARIANT, COUNTRY_VARIANTS[i][0], COUNTRY_VARIANTS[i][1]])
+    }
+  }
+
+  WebApp._onInitAppRunner = function (emitter) {
+    Nuvola.core.connect('InitializationForm', this)
+    Nuvola.core.connect('PreferencesForm', this)
+  }
+
+  WebApp._onPreferencesForm = function (emitter, values, entries) {
+    this.appendPreferences(values, entries)
+  }
+
+  WebApp._onHomePageRequest = function (emitter, result) {
+    result.url = Nuvola.format(HOME_PAGE, Nuvola.config.get(COUNTRY_VARIANT))
   }
 
   // Extract data from the web page
@@ -127,6 +174,12 @@
       request.newWindow = false
     } else {
       Nuvola.WebApp._onNavigationRequest.call(this, object, request)
+    }
+  }
+
+  WebApp._onConfigChanged = function (emitter, key) {
+    if (key === COUNTRY_VARIANT) {
+      Nuvola.actions.activate('go-home', null)
     }
   }
 
